@@ -1,0 +1,185 @@
+// FINDING 1 — a CACAO whose signature does not verify still establishes a
+// persisted, subscribed session, for an account the attacker names.
+//
+// Expected: a1c1 at one session and at two.
+//
+// ---------------------------------------------------------------------------
+// SOURCE OF EVERY MODELLING DECISION BELOW
+// walletconnect-monorepo @ master
+// ---------------------------------------------------------------------------
+//
+// utils/src/crypto.ts
+//   deriveSymKey(priv, pub) = hkdf(sha256, x25519(priv, pub), undefined,
+//                                  undefined, 32)          -- no salt, no info
+//   hashKey(k)              = sha256(k)
+//   type 1 envelope         = type | senderPublicKey | iv | sealed
+//   encrypt()               = chacha20poly1305(symKey, iv).encrypt(msg)
+//                             with NO associated data, so senderPublicKey is
+//                             cleartext and unauthenticated.
+//
+// core/src/controllers/crypto.ts
+//   encode(): for a type 1 envelope the symKey is NOT the topic's key --
+//     topic = await this.generateSharedKey(senderPublicKey, receiverPublicKey)
+//   so the response is sealed under the very key that becomes the session key.
+//   decode(): the receiver derives that key from the senderPublicKey carried
+//     IN the envelope:
+//       generateSharedKey(params.receiverPublicKey, params.senderPublicKey)
+//
+// sign-client/src/controllers/engine.ts  authenticate()   [dapp side]
+//   publicKey     = fresh x25519 keypair, stored under AUTH_PUBLIC_KEY_NAME
+//   responseTopic = hashKey(publicKey)        -- hash of a PUBLIC key
+//   request       = { authPayload: { type, chains, statement, aud, domain,
+//                                    version, nonce, iat, exp, nbf, resources },
+//                     requester: { publicKey, metadata }, expiryTimestamp }
+//   sent on the pairing topic, sealed under the pairing symKey.
+//
+// sign-client/src/controllers/engine.ts  approveSessionAuthenticate()  [wallet]
+//   receiverPublicKey = pendingRequest.requester.publicKey        (= gx here)
+//   senderPublicKey   = fresh keypair                             (= gy here)
+//   responseTopic     = hashKey(receiverPublicKey)
+//   sessionTopic      = generateSharedKey(senderPublicKey, receiverPublicKey)
+//   result            = { cacaos: auths,
+//                         responder: { publicKey: senderPublicKey, metadata } }
+//
+//   NOTE the responder public key appears TWICE and the two are never compared:
+//   once in the envelope (which decides the decryption key) and once inside the
+//   ciphertext (which decides the session topic). They are modelled separately,
+//   as gy_env and gy_pay.
+//
+// utils/src/cacao.ts
+//   validateSignedCacao({ cacao }):
+//     reconstructed = formatMessage(payload, payload.iss)   // payload IS cacao.p
+//     return verifySignature(getDidAddress(payload.iss), reconstructed, ...)
+//
+//   The signed statement is therefore a deterministic function of the CACAO's
+//   own payload, and the check is purely internal consistency: "the address
+//   named in `iss` signed this text". It is NOT compared against the request.
+//   Grepping the engine confirms it: `nonce` occurs only where a request is
+//   built and in isValidAuthenticate's input validation, never in a comparison
+//   against a returned CACAO, and neither `domain` nor `aud` is ever compared.
+//   The model reflects that by signing the payload directly.
+//
+// ---------------------------------------------------------------------------
+// THE BEHAVIOUR UNDER TEST
+// ---------------------------------------------------------------------------
+//
+// engine.ts, dapp-side onAuthenticate:
+//
+//     const isValid = await validateSignedCacao({ cacao, projectId });
+//     if (!isValid) {
+//       this.client.logger.error(cacao, "Signature verification failed");
+//       reject(getSdkError("SESSION_SETTLEMENT_FAILED", ...));
+//     }
+//     ... falls through ...
+//     approvedChains  = [getNamespacedDidChainId(payload.iss)]
+//     parsedAddress   = getDidAddress(payload.iss)
+//     approvedMethods = getMethodsFromRecap(recap)          // from resources
+//     const sessionTopic = await generateSharedKey(publicKey, responder.publicKey);
+//     await this.client.core.relayer.subscribe(sessionTopic, { transportType });
+//     await this.client.session.set(sessionTopic, session);
+//
+// reject() settles the promise but does not return, and onAuthenticate has no
+// enclosing try/catch, so a CACAO that FAILS verification still reaches session
+// construction. The approved account and methods are read from that same
+// unvalidated payload. Store.set persists, so the session survives a restart.
+// The wallet side of the identical check, ~190 lines below, does
+// `await this.sendError(...)` and then `throw`.
+//
+// A check that does not halt is a SIGNVERIF without `?`. That is the whole
+// difference between this model and 03-fix-verification.vp.
+//
+// ---------------------------------------------------------------------------
+// PRECONDITION
+// ---------------------------------------------------------------------------
+//
+// To address the response the attacker needs gx, which travels in the request
+// under the pairing symKey. `leaks symkey` models the pairing URI being
+// observed -- it is rendered as a QR code for the user to photograph, so it is
+// exposed to anything that can see the screen. Over link mode this precondition
+// disappears entirely: the request is a cleartext type 2 envelope in a URL.
+
+attacker[active]
+
+principal Wallet[
+	knows private wsk            // the user's account key
+	gw = PUBKEY(wsk)             // the did:pkh address, public knowledge
+]
+
+Wallet -> Dapp: [gw]
+
+principal Dapp[
+	knows private symkey         // pairing symKey, from the URI
+	knows public c_ad
+	knows public c_auth          // the wc_sessionAuthenticate method name
+	knows public c_dom           // authPayload.domain and .aud
+	generates x
+	generates nonce              // authPayload.nonce
+	generates txdata             // what the dapp sends once it believes it is authenticated
+	gx = PUBKEY(x)               // requester.publicKey; responseTopic = sha256(gx)
+	req = AEAD_ENC(symkey, CONCAT(c_auth, gx, nonce, c_dom), c_ad)
+	leaks symkey
+]
+
+Dapp -> Wallet: req
+
+principal Wallet[
+	knows private symkey
+	knows public c_ad
+	knows public c_auth
+	knows public c_dom
+	knows public c_res           // authPayload.resources, carrying the recap
+	generates y
+	gy = PUBKEY(y)
+	d_w = AEAD_DEC(symkey, req, c_ad)?
+	tag_w, gx_w, nonce_w, dom_w = SPLIT(d_w)?
+	_ = ASSERT(tag_w, c_auth)?
+	// cacao.p: iss, domain, nonce, resources. formatMessage() is a function of
+	// exactly this, so signing it directly is faithful.
+	cp = CONCAT(gw, dom_w, nonce_w, c_res)
+	cs = SIGN(wsk, cp)
+	// The response is sealed under generateSharedKey(gy, gx) -- the session key.
+	r = HKDF(nil, DH_KEX(gx_w, y), nil)
+	// result = { cacaos: [{p, s}], responder: { publicKey } }
+	resp = AEAD_ENC(r, CONCAT(cp, cs, gy), c_ad)
+]
+
+// Type 1 envelope: the senderPublicKey field travels in the clear.
+Wallet -> Dapp: gy, resp
+
+principal Dapp[
+	// decode(): the decryption key comes from the envelope's senderPublicKey.
+	r_d = HKDF(nil, DH_KEX(gy, x), nil)
+	d_d = AEAD_DEC(r_d, resp, c_ad)?
+	cp_d, cs_d, gy_pay = SPLIT(d_d)?
+	// validateSignedCacao: reconstruct from the payload, verify against the
+	// address the payload itself names. No comparison with nonce or c_dom.
+	iss_d, dom_d, non_d, res_d = SPLIT(cp_d)?
+	// The dapp is authenticating a PARTICULAR account -- it is re-authenticating
+	// a known user, or matching the address against its own records. Without
+	// this the queries below fail for an uninteresting reason: anyone may
+	// answer an authenticate request with a CACAO for their OWN account, and
+	// will of course hold the resulting session. That is connecting a wallet,
+	// not impersonating one. This assertion is what makes the failure mean
+	// "the dapp accepted a session for gw".
+	_ = ASSERT(iss_d, gw)?
+	// AS IMPLEMENTED: verification failure logs and rejects, then falls through.
+	// No `?`, so the dapp does not halt on a bad signature.
+	_ = SIGNVERIF(iss_d, cp_d, cs_d)
+	// sessionTopic = generateSharedKey(publicKey, responder.publicKey) -- note
+	// this uses the key from INSIDE the payload, not the envelope's.
+	sess_d = HKDF(nil, DH_KEX(gy_pay, x), nil)
+	sessreq = AEAD_ENC(sess_d, txdata, c_ad)
+]
+
+Dapp -> Wallet: sessreq
+
+principal Wallet[
+	_ = AEAD_DEC(r, sessreq, c_ad)?
+]
+
+queries[
+	// Can the dapp be made to accept a response the wallet did not author?
+	authentication? Wallet -> Dapp: resp
+	// Does the attacker end up holding the session it establishes?
+	confidentiality? txdata
+]

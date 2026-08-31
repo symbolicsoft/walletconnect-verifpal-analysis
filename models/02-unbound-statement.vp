@@ -1,0 +1,189 @@
+// FINDING 2 — a CACAO issued for a DIFFERENT relying party, with a different
+// domain and a different nonce, is accepted and establishes a session. Fixing
+// Finding 1's missing `return` does not help, because the check that then runs
+// is one of internal consistency only.
+//
+// Expected: a1c1 at one session and at two.
+//
+// ---------------------------------------------------------------------------
+// WHY THIS SURVIVES THE OBVIOUS FIX
+// ---------------------------------------------------------------------------
+//
+// utils/src/cacao.ts:
+//
+//     export async function validateSignedCacao({ cacao, projectId }) {
+//       const { s: signature, p: payload } = cacao;
+//       reconstructed = formatMessage(payload, payload.iss);
+//       const walletAddress = getDidAddress(payload.iss);
+//       return await verifySignature(walletAddress, reconstructed, signature,
+//                                    getNamespacedDidChainId(payload.iss), projectId);
+//     }
+//
+// The message verified against is rebuilt from the CACAO's OWN payload. The
+// function answers exactly one question -- "did the address named in `iss`
+// sign this text?" -- and nothing ties that text to the request that was sent.
+//
+// This is not an omission at one call site. Across
+// sign-client/src/controllers/engine.ts, `nonce` appears only where a request
+// is constructed (lines 310, 323, 964, 1042) and inside isValidAuthenticate's
+// input validation (3277, 3289), never in a comparison against a returned
+// CACAO. `domain` and `aud` are never compared at all. The dapp-side
+// onAuthenticate handler reads `cacaos` and `responder` out of the result and
+// goes straight to signature verification, account extraction and session
+// construction.
+//
+// The SDK does hand `auths` back to the caller, so an application COULD run
+// the SIWE relying-party checks itself. But the session is built, subscribed
+// and persisted before the promise settles, so an application that performs
+// those checks afterwards is checking something the SDK has already acted on.
+//
+// This model therefore uses the CHECKED form, SIGNVERIF(...)?, which is what
+// the code does once Finding 1's missing `return` is added. The attack does
+// not depend on that bug at all.
+//
+// ---------------------------------------------------------------------------
+// THE ATTACK
+// ---------------------------------------------------------------------------
+//
+// Evil is a relying party the user genuinely signs in to -- a site the
+// attacker runs. That sign-in is entirely honest: the wallet checks the
+// request, the user approves, and the wallet issues a CACAO naming Evil's
+// domain and Evil's nonce. Evil holds it legitimately.
+//
+// Evil then presents that same CACAO to an unrelated honest dapp. The dapp
+// verifies the signature -- it is genuine -- and never notices that the
+// statement names somebody else's domain and a nonce it never issued. It
+// installs a session for the user's account, keyed to a public key Evil chose.
+//
+// Modelling notes, all as in 01-signature-bypass.vp: HKDF with neither salt
+// nor info; type 1 envelopes carrying senderPublicKey in the clear outside the
+// AEAD; the response sealed under generateSharedKey(gy, gx), which is the
+// session key; the responder public key appearing both in the envelope (which
+// decides decryption) and inside the ciphertext (which decides the session
+// topic), never compared.
+//
+// PRECONDITION: to deliver the response the attacker needs gx, which rides in
+// the request under the pairing symKey, hence `leaks symkey` -- the pairing URI
+// is displayed as a QR code. Over link mode the request is a cleartext type 2
+// envelope in a URL and this precondition disappears.
+
+attacker[active]
+
+principal Wallet[
+	knows private wsk
+	gw = PUBKEY(wsk)
+]
+
+Wallet -> Dapp: [gw]
+Wallet -> Evil: [gw]
+
+// ===========================================================================
+// Exchange 1: the user honestly signs in to Evil's site.
+// ===========================================================================
+
+principal Evil[
+	knows private esym           // Evil's own pairing with the wallet
+	knows public c_ad
+	knows public c_auth
+	knows public c_edom          // Evil's domain
+	knows public c_res
+	generates ex
+	generates enonce             // Evil's nonce
+	gex = PUBKEY(ex)
+	ereq = AEAD_ENC(esym, CONCAT(c_auth, gex, enonce, c_edom), c_ad)
+]
+
+Evil -> Wallet: ereq
+
+principal Wallet[
+	knows private esym
+	knows public c_ad
+	knows public c_auth
+	knows public c_res
+	generates ey
+	gey = PUBKEY(ey)
+	de_w = AEAD_DEC(esym, ereq, c_ad)?
+	etag, gex_w, enonce_w, edom_w = SPLIT(de_w)?
+	_ = ASSERT(etag, c_auth)?
+	ecp = CONCAT(gw, edom_w, enonce_w, c_res)
+	ecs = SIGN(wsk, ecp)
+	er = HKDF(nil, DH_KEX(gex_w, ey), nil)
+	eresp = AEAD_ENC(er, CONCAT(ecp, ecs, gey), c_ad)
+]
+
+Wallet -> Evil: gey, eresp
+
+principal Evil[
+	er_e = HKDF(nil, DH_KEX(gey, ex), nil)
+	de_e = AEAD_DEC(er_e, eresp, c_ad)?
+	ecp_r, ecs_r, gey_p = SPLIT(de_e)?
+	// Evil is the attacker: what it holds legitimately, the attacker holds.
+	leaks ecp_r
+	leaks ecs_r
+]
+
+// ===========================================================================
+// Exchange 2: an unrelated honest dapp authenticates the same account.
+// ===========================================================================
+
+principal Dapp[
+	knows private symkey
+	knows public c_ad
+	knows public c_auth
+	knows public c_dom           // the honest dapp's domain, distinct from c_edom
+	generates x
+	generates nonce              // the honest dapp's nonce, never issued to Evil
+	generates txdata
+	gx = PUBKEY(x)
+	req = AEAD_ENC(symkey, CONCAT(c_auth, gx, nonce, c_dom), c_ad)
+	leaks symkey
+]
+
+Dapp -> Wallet: req
+
+principal Wallet[
+	knows private symkey
+	knows public c_dom
+	generates y
+	gy = PUBKEY(y)
+	d_w = AEAD_DEC(symkey, req, c_ad)?
+	tag_w, gx_w, nonce_w, dom_w = SPLIT(d_w)?
+	_ = ASSERT(tag_w, c_auth)?
+	cp = CONCAT(gw, dom_w, nonce_w, c_res)
+	cs = SIGN(wsk, cp)
+	r = HKDF(nil, DH_KEX(gx_w, y), nil)
+	resp = AEAD_ENC(r, CONCAT(cp, cs, gy), c_ad)
+]
+
+Wallet -> Dapp: gy, resp
+
+principal Dapp[
+	r_d = HKDF(nil, DH_KEX(gy, x), nil)
+	d_d = AEAD_DEC(r_d, resp, c_ad)?
+	cp_d, cs_d, gy_pay = SPLIT(d_d)?
+	iss_d, dom_d, non_d, res_d = SPLIT(cp_d)?
+	// The dapp is authenticating a PARTICULAR account -- it is re-authenticating
+	// a known user, or matching the address against its own records. Without
+	// this the queries below fail for an uninteresting reason: anyone may
+	// answer an authenticate request with a CACAO for their OWN account, and
+	// will of course hold the resulting session. That is connecting a wallet,
+	// not impersonating one. This assertion is what makes the failure mean
+	// "the dapp accepted a session for gw".
+	_ = ASSERT(iss_d, gw)?
+	// FINDING 1 REPAIRED: this check now halts. It still only asks whether the
+	// address named in the payload signed the payload.
+	_ = SIGNVERIF(iss_d, cp_d, cs_d)?
+	sess_d = HKDF(nil, DH_KEX(gy_pay, x), nil)
+	sessreq = AEAD_ENC(sess_d, txdata, c_ad)
+]
+
+Dapp -> Wallet: sessreq
+
+principal Wallet[
+	_ = AEAD_DEC(r, sessreq, c_ad)?
+]
+
+queries[
+	authentication? Wallet -> Dapp: resp
+	confidentiality? txdata
+]

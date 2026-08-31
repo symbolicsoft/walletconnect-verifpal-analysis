@@ -1,0 +1,11 @@
+{
+  "name": "wc-auth-poc",
+  "private": true,
+  "type": "module",
+  "description": "Proofs of concept for the two findings, run against shipped WalletConnect code.",
+  "dependencies": {
+    "@walletconnect/sign-client": "^2.24.0",
+    "@walletconnect/utils": "^2.24.0",
+    "ox": "^1.7.4"
+  }
+}

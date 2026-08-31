@@ -1,0 +1,1560 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<title>Verifpal report · 01-signature-bypass.vp</title>
+	<style>
+		:root {
+			--ink: #0e161d;
+			--ink-2: #2b3a45;
+			--ink-3: #566975;
+			--ink-4: #8899a4;
+			--paper: #edf1f4;
+			--surface: #ffffff;
+			--surface-2: #f6f8fa;
+			--line: #d3dce3;
+			--line-soft: #e4eaef;
+			--olive: #6e7d2c;
+			--olive-deep: #4f5b1d;
+			--olive-tint: #e9eed7;
+			--olive-line: #c6d0a3;
+			--azure: #1a6ab3;
+			--azure-deep: #12507f;
+			--azure-tint: #e1ecf7;
+			--azure-line: #b5d1e9;
+			--breach: #b23a2b;
+			--breach-deep: #8c2b1e;
+			--breach-tint: #f9e8e5;
+			--breach-line: #e7c2ba;
+			--sienna: #96501f;
+			--sienna-tint: #fbefe2;
+			--sienna-line: #e3cbb0;
+			--syn-principal: #3c5f9e;
+			--syn-primitive: #2f6b1f;
+			--syn-capability: #9a6a1c;
+			--mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+			--serif: 'Nimbus Roman', 'Times New Roman', Georgia, serif;
+			--sans: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+			--radius: 4px;
+			--radius-lg: 6px;
+		}
+
+		@media screen and (prefers-color-scheme: dark) {
+			:root {
+				--ink: #e6edf3;
+				--ink-2: #c2ced8;
+				--ink-3: #93a3b0;
+				--ink-4: #6b7c8a;
+				--paper: #0d1319;
+				--surface: #141c24;
+				--surface-2: #1a242d;
+				--line: #2b3a46;
+				--line-soft: #223039;
+				--olive: #a8bd58;
+				--olive-deep: #c3d67e;
+				--olive-tint: #232f18;
+				--olive-line: #46552a;
+				--azure: #6fb2ec;
+				--azure-deep: #9acbf5;
+				--azure-tint: #14263a;
+				--azure-line: #2c4a6b;
+				--breach: #f0806e;
+				--breach-deep: #f7a595;
+				--breach-tint: #331a16;
+				--breach-line: #5d2f27;
+				--sienna: #d9a06a;
+				--sienna-tint: #33261a;
+				--sienna-line: #5c452c;
+				--syn-principal: #85aae0;
+				--syn-primitive: #8fcb72;
+				--syn-capability: #d8ac63;
+			}
+		}
+
+		*,
+		*::before,
+		*::after {
+			box-sizing: border-box;
+		}
+
+		body {
+			background: var(--paper);
+			color: var(--ink);
+			font-family: var(--sans);
+			font-size: 15px;
+			line-height: 1.65;
+			margin: 0 auto;
+			max-width: 980px;
+			padding: 44px 28px 72px;
+			-webkit-font-smoothing: antialiased;
+		}
+
+		a {
+			color: var(--azure);
+			text-decoration: none;
+			text-underline-offset: 2px;
+		}
+
+		a:hover {
+			color: var(--azure-deep);
+			text-decoration: underline;
+		}
+
+		::selection {
+			background: var(--azure-tint);
+			color: var(--ink);
+		}
+
+		h1 {
+			font-family: var(--serif);
+			font-weight: normal;
+			font-size: 2.6rem;
+			letter-spacing: -0.025em;
+			line-height: 1.05;
+			margin: 0;
+		}
+
+		.eyebrow {
+			display: block;
+			font-family: var(--mono);
+			font-size: 0.68rem;
+			font-weight: 500;
+			letter-spacing: 0.15em;
+			text-transform: uppercase;
+			color: var(--ink-3);
+			margin: 0 0 8px;
+		}
+
+		header.page {
+			padding-bottom: 20px;
+			border-bottom: 1px solid var(--line);
+			margin-bottom: 36px;
+		}
+
+		header.page .meta {
+			font-family: var(--mono);
+			font-size: 0.72rem;
+			letter-spacing: 0.02em;
+			color: var(--ink-3);
+			margin: 10px 0 0;
+		}
+
+		.runIndex {
+			background: var(--surface);
+			border: 1px solid var(--line);
+			border-radius: var(--radius-lg);
+			padding: 14px 20px 16px;
+			margin: 0 0 36px;
+		}
+
+		.runList {
+			list-style: none;
+			margin: 8px 0 0;
+			padding: 0;
+			font-family: var(--mono);
+			font-size: 0.76rem;
+		}
+
+		.runItem {
+			display: flex;
+			align-items: baseline;
+			gap: 12px;
+			flex-wrap: wrap;
+			padding: 7px 0;
+			border-top: 1px dashed var(--line);
+		}
+
+		.runItem.fail {
+			border-left: 2px solid var(--breach-line);
+			padding-left: 10px;
+		}
+
+		.runItem.pass {
+			border-left: 2px solid var(--olive-line);
+			padding-left: 10px;
+		}
+
+		.runFile {
+			color: var(--ink);
+			word-break: break-all;
+		}
+
+		.runFile:hover {
+			color: var(--azure-deep);
+		}
+
+		.runStatus {
+			margin-left: auto;
+			letter-spacing: 0.04em;
+		}
+
+		.runMeta {
+			color: var(--ink-4);
+			font-size: 0.9em;
+			min-width: 12ch;
+			text-align: right;
+		}
+
+		section.model {
+			scroll-margin-top: 16px;
+		}
+
+		.panelSection.trace {
+			scroll-margin-top: 16px;
+		}
+
+		section.model {
+			margin: 0 0 44px;
+		}
+
+		.panel {
+			background: var(--surface);
+			border: 1px solid var(--line);
+			border-radius: var(--radius-lg);
+			overflow: hidden;
+		}
+
+		.panelHead {
+			display: flex;
+			align-items: center;
+			gap: 16px;
+			flex-wrap: wrap;
+			background: var(--surface-2);
+			border-bottom: 1px solid var(--line);
+			padding: 11px 20px;
+		}
+
+		.paneLabel {
+			display: flex;
+			align-items: center;
+			gap: 8px;
+			font-family: var(--mono);
+			font-size: 0.68rem;
+			letter-spacing: 0.12em;
+			text-transform: uppercase;
+			color: var(--ink-3);
+		}
+
+		.paneMark {
+			width: 6px;
+			height: 6px;
+			border-radius: 50%;
+			background: var(--azure);
+			flex-shrink: 0;
+		}
+
+		.panelHead .meta {
+			margin-left: auto;
+			font-family: var(--mono);
+			font-size: 0.68rem;
+			letter-spacing: 0.05em;
+			color: var(--ink-3);
+		}
+
+		.code .pass {
+			color: var(--olive-deep);
+			font-weight: 700;
+		}
+
+		.code .fail {
+			color: var(--breach);
+			font-weight: 700;
+		}
+
+		.panelSection {
+			padding: 16px 20px;
+		}
+
+		.panelSection+.panelSection {
+			border-top: 1px solid var(--line);
+		}
+
+		.sectionRow {
+			display: flex;
+			align-items: baseline;
+			gap: 14px;
+		}
+
+		.sectionRow .eyebrow {
+			margin: 0;
+		}
+
+		.tally {
+			margin-left: auto;
+			font-family: var(--mono);
+			font-size: 0.68rem;
+			letter-spacing: 0.08em;
+		}
+
+		.tally.pass {
+			color: var(--olive-deep);
+		}
+
+		.tally.fail {
+			color: var(--breach);
+		}
+
+		.verdicts {
+			margin-top: 4px;
+		}
+
+		.verdict {
+			display: grid;
+			grid-template-columns: 18px minmax(0, 1fr);
+			gap: 0 10px;
+			padding: 12px 0;
+			font-family: var(--mono);
+		}
+
+		.verdict+.verdict {
+			border-top: 1px dashed var(--line);
+		}
+
+		.verdict .mark {
+			font-size: 0.9rem;
+			font-weight: 700;
+			text-align: center;
+			line-height: 1.4;
+		}
+
+		.verdict .query {
+			font-size: 0.8rem;
+			line-height: 1.4;
+			word-break: break-word;
+			color: var(--ink);
+		}
+
+		.verdict .query a {
+			color: inherit;
+		}
+
+		.verdict .qkind {
+			display: inline-block;
+			margin-right: 8px;
+			font-size: 0.62rem;
+			letter-spacing: 0.1em;
+			text-transform: uppercase;
+			color: var(--ink-3);
+			background: var(--surface-2);
+			border: 1px solid var(--line-soft);
+			border-radius: var(--radius);
+			padding: 1px 5px;
+			vertical-align: 1px;
+		}
+
+		.verdict .loc {
+			margin-left: 10px;
+			color: var(--ink-4);
+			font-size: 0.85em;
+			letter-spacing: 0.04em;
+		}
+
+		.verdict .ruling {
+			grid-column: 2;
+			font-size: 0.7rem;
+			letter-spacing: 0.11em;
+			text-transform: uppercase;
+			margin-top: 5px;
+		}
+
+		.verdict .because {
+			grid-column: 2;
+			font-family: var(--sans);
+			font-size: 0.82rem;
+			line-height: 1.55;
+			color: var(--ink-2);
+			margin-top: 5px;
+			max-width: 64ch;
+		}
+
+		.verdict .precondition {
+			grid-column: 2;
+			font-family: var(--sans);
+			font-size: 0.8rem;
+			line-height: 1.55;
+			color: var(--sienna);
+			margin-top: 5px;
+			max-width: 64ch;
+		}
+
+		.verdictPass .mark,
+		.verdictPass .ruling {
+			color: var(--olive-deep);
+		}
+
+		.verdictFail .mark,
+		.verdictFail .ruling {
+			color: var(--breach);
+		}
+
+		.callout {
+			border: 1px solid var(--sienna-line);
+			background: var(--sienna-tint);
+			border-radius: var(--radius);
+			padding: 12px 16px;
+			margin: 14px 0 2px;
+			font-size: 0.85rem;
+			line-height: 1.6;
+			color: var(--sienna);
+		}
+
+		.callout ul {
+			margin: 6px 0 0;
+			padding-left: 18px;
+		}
+
+		.callout li {
+			margin: 3px 0;
+		}
+
+		.callout.notes {
+			border-color: var(--azure-line);
+			background: var(--azure-tint);
+			color: var(--azure-deep);
+		}
+
+		.peer {
+			font-size: 0.78rem;
+			letter-spacing: 0.02em;
+			opacity: 0.85;
+		}
+
+		.peer::before {
+			content: "\2014\a0";
+		}
+
+		.callout code {
+			font-family: var(--mono);
+			font-size: 0.92em;
+		}
+
+		.scope {
+			background: var(--surface-2);
+			font-size: 0.8rem;
+			line-height: 1.65;
+			color: var(--ink-3);
+		}
+
+		.scope p {
+			margin: 4px 0 0;
+			max-width: 74ch;
+		}
+
+		.pageFoot {
+			margin: 8px 0 0;
+			padding-top: 18px;
+			border-top: 1px solid var(--line);
+			font-size: 0.78rem;
+			line-height: 1.6;
+			color: var(--ink-3);
+			max-width: 74ch;
+		}
+
+		.pageFoot p {
+			margin: 0;
+		}
+
+		.attackerKind {
+			color: var(--ink-2);
+			font-weight: 500;
+		}
+
+		.attackerKind.passive {
+			color: var(--sienna);
+		}
+
+		.cut {
+			margin-left: 8px;
+			font-family: var(--mono);
+			font-size: 0.68rem;
+			letter-spacing: 0.04em;
+			color: var(--sienna);
+			border: 1px solid var(--sienna-line);
+			background: var(--sienna-tint);
+			border-radius: 3px;
+			padding: 0 5px;
+		}
+
+		.offscreen {
+			position: absolute;
+			width: 1px;
+			height: 1px;
+			margin: -1px;
+			padding: 0;
+			overflow: hidden;
+			clip-path: inset(50%);
+			white-space: nowrap;
+			border: 0;
+		}
+
+		.scroll {
+			overflow-x: auto;
+			overscroll-behavior-x: contain;
+		}
+
+		.figure {
+			margin: 0;
+		}
+
+		.runFilter {
+			margin: 2px 0 8px;
+			font-size: 0.78rem;
+			color: var(--ink-3);
+		}
+
+		.runFilter label {
+			display: inline-flex;
+			align-items: center;
+			gap: 6px;
+			cursor: pointer;
+		}
+
+		.runItem[hidden],
+		section.model[hidden] {
+			display: none;
+		}
+
+		.trace .eyebrow {
+			margin-bottom: 10px;
+		}
+
+		.trace .eyebrow .q {
+			color: var(--ink);
+			text-transform: none;
+			letter-spacing: 0;
+		}
+
+		.trace .eyebrow .q:hover {
+			color: var(--azure-deep);
+			text-decoration: underline;
+		}
+
+		.traceSteps {
+			margin-top: 4px;
+		}
+
+		.traceStep {
+			display: grid;
+			grid-template-columns: 3.2em minmax(0, 1fr);
+			width: calc(100% + 12px);
+			text-align: left;
+			font-family: var(--mono);
+			font-size: 0.74rem;
+			line-height: 1.7;
+			color: var(--ink-2);
+			background: none;
+			border: 0;
+			padding: 2px 6px;
+			margin: 0 -6px;
+			border-radius: 3px;
+			cursor: pointer;
+		}
+
+		.traceStep[aria-pressed="true"] {
+			background: var(--azure-tint);
+			box-shadow: inset 2px 0 0 var(--azure);
+		}
+
+		.traceGroup {
+			margin: 0;
+		}
+
+		.traceGroup>summary {
+			display: grid;
+			grid-template-columns: 3.2em minmax(0, 1fr);
+			font-family: var(--mono);
+			font-size: 0.74rem;
+			line-height: 1.7;
+			color: var(--ink-3);
+			padding: 2px 6px;
+			margin: 0 -6px;
+			border-radius: 3px;
+			cursor: pointer;
+			list-style: none;
+		}
+
+		.traceGroup>summary::-webkit-details-marker {
+			display: none;
+		}
+
+		.traceGroup>summary .n::after {
+			content: "\a0\25b8";
+		}
+
+		.traceGroup[open]>summary .n::after {
+			content: "\a0\25be";
+		}
+
+		.traceGroup>summary:hover,
+		.traceGroup>summary.isOn {
+			background: var(--azure-tint);
+		}
+
+		.traceGroup>.traceStep {
+			margin-left: 12px;
+			width: calc(100% - 12px);
+		}
+
+		.traceStep.isOn {
+			background: var(--azure-tint);
+		}
+
+		.traceStep:focus {
+			outline: 2px solid var(--azure);
+			outline-offset: -2px;
+		}
+
+		.traceStep:focus:not(:focus-visible) {
+			outline: none;
+		}
+
+		.traceVal {
+			display: block;
+			margin: 3px 0 3px 1.2em;
+			padding-left: 10px;
+			border-left: 2px solid var(--breach-line);
+		}
+
+		.tvName {
+			color: var(--ink);
+			font-weight: 500;
+		}
+
+		.tvGuard {
+			color: var(--olive-deep);
+		}
+
+		.tvArrow {
+			color: var(--breach);
+		}
+
+		.tvNew {
+			color: var(--breach-deep);
+		}
+
+		.tvWas {
+			display: block;
+			color: var(--ink-4);
+		}
+
+		.tvRelay {
+			color: var(--ink-4);
+			font-style: italic;
+		}
+
+		.traceStep .n {
+			color: var(--ink-4);
+		}
+
+		.traceStep .kind {
+			text-transform: uppercase;
+			font-size: 0.85em;
+			letter-spacing: 0.08em;
+			color: var(--ink-4);
+			margin-right: 8px;
+		}
+
+		.traceStep .kind.mutations,
+		.traceStep .kind.replay,
+		.traceStep .kind.bypass {
+			color: var(--breach);
+		}
+
+		.traceStep .kind.gate {
+			color: var(--sienna);
+		}
+
+		.traceStep .kind.resolves,
+		.traceStep .kind.static,
+		.traceStep .kind.received {
+			color: var(--azure-deep);
+		}
+
+		.errorBody {
+			margin: 0;
+			padding: 16px 20px;
+			font-family: var(--mono);
+			font-size: 0.74rem;
+			line-height: 1.7;
+			color: var(--breach-deep);
+			background: var(--breach-tint);
+			white-space: pre-wrap;
+			overflow-x: auto;
+		}
+
+		.source {
+			margin: 4px 0 0;
+			padding: 0;
+			font-family: var(--mono);
+			font-size: 0.72rem;
+			line-height: 1.75;
+			color: var(--ink-2);
+			overflow-x: auto;
+			tab-size: 4;
+		}
+
+		.source mark {
+			border-radius: 3px;
+			padding: 1px 3px;
+			color: inherit;
+			scroll-margin-top: 24px;
+		}
+
+		.source mark:target {
+			outline: 1px solid currentColor;
+			outline-offset: 1px;
+		}
+
+		.source mark.pass {
+			background: var(--olive-tint);
+			color: var(--olive-deep);
+		}
+
+		.source mark.fail {
+			background: var(--breach-tint);
+			color: var(--breach-deep);
+		}
+
+		.source .k {
+			color: var(--olive-deep);
+			font-weight: 500;
+		}
+
+		.source .p {
+			color: var(--syn-principal);
+		}
+
+		.source .f {
+			color: var(--syn-primitive);
+		}
+
+		.source .q {
+			color: var(--azure-deep);
+		}
+
+		.source .a {
+			color: var(--syn-capability);
+			font-weight: 500;
+		}
+
+		.source .c {
+			color: var(--ink-4);
+			font-style: italic;
+		}
+
+		.diagram {
+			display: block;
+			margin: 6px 0 0;
+		}
+
+		.diagram .msgHop {
+			fill: var(--ink-4);
+		}
+
+		.diagram .actor {
+			font: 500 13px var(--mono);
+			fill: var(--ink);
+			text-anchor: middle;
+		}
+
+		.diagram .lifeline {
+			stroke: var(--line);
+		}
+
+		.diagram .wire {
+			stroke: var(--ink-2);
+			stroke-width: 1.2;
+		}
+
+		.diagram .arrowhead {
+			fill: var(--ink-2);
+		}
+
+		.diagram .msg {
+			font: 11px var(--mono);
+			fill: var(--ink-2);
+			text-anchor: middle;
+			paint-order: stroke;
+			stroke: var(--surface);
+			stroke-width: 4px;
+		}
+
+		.diagram .phase {
+			stroke: var(--line);
+			stroke-dasharray: 6 4;
+		}
+
+		.diagram .phaselabel {
+			font: 10px var(--mono);
+			fill: var(--ink-4);
+			letter-spacing: 0.08em;
+		}
+
+		.diagram .hopNum {
+			font: 10px var(--mono);
+			fill: var(--ink-4);
+			text-anchor: end;
+		}
+
+		.diagram .msgSep {
+			fill: var(--ink-3);
+		}
+
+		.diagram .msgVal.guarded {
+			fill: var(--olive-deep);
+		}
+
+		.diagram .msgVal.hit {
+			fill: var(--breach);
+		}
+
+		.diagram .msgVal.isHit {
+			font-weight: 700;
+		}
+
+		.diagram .msgVal.isDim {
+			opacity: 0.25;
+		}
+
+		.figNote {
+			font-family: var(--mono);
+			font-size: 0.68rem;
+			line-height: 1.6;
+			color: var(--ink-3);
+			margin: 8px 0 0;
+		}
+
+		.diagram .leak {
+			font: italic 11px var(--mono);
+			fill: var(--sienna);
+			text-anchor: middle;
+			paint-order: stroke;
+			stroke: var(--surface);
+			stroke-width: 4px;
+		}
+
+		.diagram .actor.attacker {
+			fill: var(--breach);
+		}
+
+		.diagram .lifeline.attacker {
+			stroke: var(--breach-line);
+		}
+
+		.diagram .wireMuted {
+			stroke: var(--ink-4);
+			stroke-width: 1;
+			stroke-dasharray: 2 3;
+		}
+
+		.diagram .wireForged {
+			stroke: var(--breach);
+			stroke-width: 1.2;
+		}
+
+		.diagram .wireReplay {
+			stroke: var(--breach);
+			stroke-width: 1.2;
+			stroke-dasharray: 6 4;
+		}
+
+		.diagram .arrowheadB {
+			fill: var(--breach);
+		}
+
+		.diagram .msg.forged {
+			fill: var(--breach);
+		}
+
+		.diagram .gateMark {
+			fill: var(--surface);
+			stroke: var(--sienna);
+			stroke-width: 1.5;
+		}
+
+		.diagram .bypassMark {
+			fill: var(--surface);
+			stroke: var(--breach);
+			stroke-width: 1.5;
+		}
+
+		.diagram .nodeLabel {
+			font: 10px var(--mono);
+			fill: var(--sienna);
+			paint-order: stroke;
+			stroke: var(--surface);
+			stroke-width: 4px;
+		}
+
+		.diagram .nodeLabel.breach {
+			fill: var(--breach);
+		}
+
+		.diagram .runBox {
+			fill: var(--surface-2);
+			stroke: var(--line);
+		}
+
+		.diagram .runLabel {
+			font: italic 10px var(--mono);
+			fill: var(--ink-3);
+			text-anchor: middle;
+		}
+
+		.diagram g.isOn line {
+			stroke-width: 2.2;
+		}
+
+		.diagram g.isOn circle {
+			stroke-width: 2.6;
+		}
+
+		.diagram g.isOn .msg,
+		.diagram g.isOn .nodeLabel,
+		.diagram g.isOn .runLabel {
+			font-weight: 700;
+		}
+
+		@media print {
+			@page {
+				margin: 16mm 14mm;
+			}
+
+			body {
+				background: #fff;
+				max-width: none;
+				padding: 0;
+				font-size: 10.5pt;
+			}
+
+			.panel {
+				border-color: #bbb;
+			}
+
+			section.model {
+				break-before: page;
+			}
+
+			section.model:first-of-type {
+				break-before: auto;
+			}
+
+			.panel,
+			.panelSection,
+			.verdict,
+			.traceStep,
+			.traceGroup,
+			.figure,
+			.callout,
+			.scope {
+				break-inside: avoid;
+			}
+
+			.eyebrow,
+			.sectionRow {
+				break-after: avoid;
+			}
+
+			.runFilter,
+			.offscreen {
+				display: none;
+			}
+
+			.scroll {
+				overflow: visible;
+			}
+
+			.diagram {
+				max-width: 100%;
+				height: auto;
+			}
+
+			.traceGroup>summary {
+				display: none;
+			}
+
+			.traceGroup>.traceStep {
+				margin-left: 0;
+				width: 100%;
+			}
+
+			.source {
+				white-space: pre-wrap;
+			}
+
+			.verdict .query a {
+				color: inherit;
+			}
+
+			.runFile[href]::after {
+				content: "";
+			}
+		}
+	</style>
+</head>
+
+<body>
+	<header class="page">
+		<span class="eyebrow">Verification report</span>
+		<h1>Verifpal</h1>
+		<p class="meta">generated by Verifpal 1.3.7 &middot; verifpal.com</p>
+	</header>
+
+	<section class="model" id="m0" data-failing="yes">
+		<div class="panel">
+			<div class="panelHead"><span class="paneLabel"><span class="paneMark"></span>../models/01-signature-bypass.vp</span><span class="meta"><span class="attackerKind active">active attacker</span> &middot; 2 sessions &middot; 307 ms &middot; <span class="code"><span class="fail">a1</span><span class="fail">c1</span></span></span></div>
+
+			<div class="panelSection"><span class="eyebrow">Protocol</span>
+				<figure class="figure">
+					<div class="scroll">
+						<svg class="diagram" width="400" height="282" viewBox="0 0 400 282" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="m0p-title">
+							<title id="m0p-title">Protocol sequence. Guarded values are written in brackets; a dagger marks every value some attack below substitutes or replays.</title>
+							<defs>
+								<marker id="m0p-a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+									<path d="M 0 0 L 10 5 L 0 10 z" class="arrowhead" />
+								</marker>
+								<marker id="m0p-b" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+									<path d="M 0 0 L 10 5 L 0 10 z" class="arrowheadB" />
+								</marker>
+							</defs>
+							<text x="100" y="22" class="actor">Wallet</text>
+							<line x1="100" y1="34" x2="100" y2="274" class="lifeline" />
+							<text x="300" y="22" class="actor">Dapp</text>
+							<line x1="300" y1="34" x2="300" y2="274" class="lifeline" />
+							<g class="row"><text x="22" y="49" class="hopNum">1</text>
+								<line x1="100" y1="56" x2="300" y2="56" class="wire" marker-end="url(#m0p-a)" /><text x="200" y="49" class="msg ">
+									<tspan class="msgVal guarded">[gw]</tspan>
+								</text>
+							</g>
+							<text x="300" y="96" class="leak">Dapp leaks symkey</text>
+							<g class="row"><text x="22" y="133" class="hopNum">2</text>
+								<line x1="300" y1="140" x2="100" y2="140" class="wire" marker-end="url(#m0p-a)" /><text x="200" y="133" class="msg ">
+									<tspan class="msgVal ">req</tspan>
+								</text>
+							</g>
+							<g class="row"><text x="22" y="175" class="hopNum">3</text>
+								<line x1="100" y1="182" x2="300" y2="182" class="wire" marker-end="url(#m0p-a)" /><text x="200" y="175" class="msg ">
+									<tspan class="msgVal hit" data-q="0 1">gy†</tspan>
+									<tspan class="msgSep">, </tspan>
+									<tspan class="msgVal hit" data-q="0 1">resp†</tspan>
+								</text>
+							</g>
+							<g class="row"><text x="22" y="217" class="hopNum">4</text>
+								<line x1="300" y1="224" x2="100" y2="224" class="wire" marker-end="url(#m0p-a)" /><text x="200" y="217" class="msg ">
+									<tspan class="msgVal ">sessreq</tspan>
+								</text>
+							</g>
+						</svg>
+					</div>
+					<ol class="offscreen">
+						<li>Hop 1: Wallet to Dapp: [gw]</li>
+						<li>Dapp leaks symkey</li>
+						<li>Hop 2: Dapp to Wallet: req</li>
+						<li>Hop 3: Wallet to Dapp: gy†, resp†</li>
+						<li>Hop 4: Dapp to Wallet: sessreq</li>
+					</ol>
+					<figcaption class="figNote">Protocol sequence. Guarded values are written in brackets; a dagger marks every value some attack below substitutes or replays.</figcaption>
+				</figure>
+			</div>
+			<div class="panelSection">
+				<div class="sectionRow"><span class="eyebrow">Verdicts</span><span class="tally fail">2 of 2 queries failed.</span></div>
+				<div class="verdicts">
+					<div class="verdict verdictFail" id="verdict-m0-q0" data-query="0">
+						<span class="mark" aria-hidden="true">×</span>
+						<span class="query"><span class="qkind">authentication</span><a href="#trace-m0-q0">authentication? Wallet -&gt; Dapp: resp</a><span class="loc">line 182</span><span class="loc">1 session variant</span></span>
+						<span class="ruling">Contradiction found</span>
+						<span class="because">resp (AEAD_ENC(r_d, d_d, c_ad)), sent by Attacker and not by Wallet, is successfully used in AEAD_DEC(r_d, resp, c_ad)? within Dapp&#39;s state.</span>
+
+					</div>
+					<div class="verdict verdictFail" id="verdict-m0-q1" data-query="1">
+						<span class="mark" aria-hidden="true">×</span>
+						<span class="query"><span class="qkind">confidentiality</span><a href="#trace-m0-q1">confidentiality? txdata</a><span class="loc">line 184</span><span class="loc">1 session variant</span></span>
+						<span class="ruling">Contradiction found</span>
+						<span class="because">txdata (txdata) is obtained by Attacker.</span>
+
+					</div>
+				</div>
+
+			</div>
+			<div class="panelSection trace" id="trace-m0-q0">
+				<span class="eyebrow">Attack trace &middot; <a class="q" href="#src-m0-q0">authentication? Wallet -&gt; Dapp: resp</a></span>
+				<figure class="figure">
+					<div class="scroll">
+						<svg class="diagram" width="600" height="366" viewBox="0 0 600 366" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false">
+							<defs>
+								<marker id="m0t0-a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+									<path d="M 0 0 L 10 5 L 0 10 z" class="arrowhead" />
+								</marker>
+								<marker id="m0t0-b" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+									<path d="M 0 0 L 10 5 L 0 10 z" class="arrowheadB" />
+								</marker>
+							</defs>
+							<text x="100" y="22" class="actor">Dapp</text>
+							<line x1="100" y1="34" x2="100" y2="358" class="lifeline" />
+							<text x="300" y="22" class="actor">Wallet</text>
+							<line x1="300" y1="34" x2="300" y2="358" class="lifeline" />
+							<text x="500" y="22" class="actor attacker">Attacker</text>
+							<line x1="500" y1="34" x2="500" y2="358" class="lifeline attacker" />
+							<text x="100" y="54" class="leak">Dapp leaks symkey</text>
+							<g class="row" data-step="1-13">
+								<rect x="416" y="85" width="168" height="22" rx="3" class="runBox" /><text x="500" y="100" class="runLabel">computes (steps 1–13)</text>
+							</g>
+							<g class="row" data-step="14"><text x="22" y="133" class="hopNum">14</text>
+								<line x1="300" y1="140" x2="500" y2="140" class="wireMuted" marker-end="url(#m0t0-a)" />
+								<line x1="500" y1="140" x2="100" y2="140" class="wireForged" marker-end="url(#m0t0-b)" /><text x="300" y="133" class="msg forged">
+									<tspan class="msgHop">hop 3 &middot; </tspan>
+									<tspan class="msgVal ">gy</tspan>
+									<tspan class="msgSep">, </tspan>
+									<tspan class="msgVal ">resp</tspan>
+								</text>
+							</g>
+							<g class="row" data-step="15"><text x="22" y="186" class="hopNum">15</text>
+								<circle cx="100" cy="182" r="5" class="gateMark" /><text x="112" y="186" class="nodeLabel ">check passes</text>
+							</g>
+							<g class="row" data-step="16"><text x="22" y="228" class="hopNum">16</text>
+								<circle cx="100" cy="224" r="5" class="gateMark" /><text x="112" y="228" class="nodeLabel ">check passes</text>
+							</g>
+							<g class="row" data-step="17"><text x="22" y="270" class="hopNum">17</text>
+								<circle cx="100" cy="266" r="5" class="gateMark" /><text x="112" y="270" class="nodeLabel ">check passes</text>
+							</g>
+							<g class="row" data-step="18"><text x="22" y="312" class="hopNum">18</text>
+								<circle cx="100" cy="308" r="5" class="gateMark" /><text x="112" y="312" class="nodeLabel ">check passes</text>
+							</g>
+						</svg>
+					</div>
+				</figure>
+				<div class="traceSteps">
+					<details class="traceGroup" data-step="1-13">
+						<summary><span class="n">1-13</span><span class="line"><span class="kind derive">derive</span>13 derivation steps</span></summary>
+						<button type="button" class="traceStep" data-step="1" aria-pressed="false"><span class="n">1</span><span class="line"><span class="kind derive">derive</span>During Wallet&#39;s run (phase 0), attacker constructs PUBKEY(nil).</span></button>
+						<button type="button" class="traceStep" data-step="2" aria-pressed="false"><span class="n">2</span><span class="line"><span class="kind derive">derive</span>During Wallet&#39;s run (phase 0), attacker observes req on the wire.</span></button>
+						<button type="button" class="traceStep" data-step="3" aria-pressed="false"><span class="n">3</span><span class="line"><span class="kind derive">derive</span>During Wallet&#39;s run (phase 0), attacker is handed symkey by a leaks declaration.</span></button>
+						<button type="button" class="traceStep" data-step="4" aria-pressed="false"><span class="n">4</span><span class="line"><span class="kind derive">derive</span>During Wallet&#39;s run (phase 0), attacker opens req with symkey, obtaining d_w.</span></button>
+						<button type="button" class="traceStep" data-step="5" aria-pressed="false"><span class="n">5</span><span class="line"><span class="kind derive">derive</span>During Wallet&#39;s run (phase 0), attacker splits d_w and takes gx.</span></button>
+						<button type="button" class="traceStep" data-step="6" aria-pressed="false"><span class="n">6</span><span class="line"><span class="kind derive">derive</span>Attacker constructs DH_KEX(gx, nil).</span></button>
+						<button type="button" class="traceStep" data-step="7" aria-pressed="false"><span class="n">7</span><span class="line"><span class="kind derive">derive</span>Attacker constructs HKDF(nil, DH_KEX(gx, nil), nil).</span></button>
+						<button type="button" class="traceStep" data-step="8" aria-pressed="false"><span class="n">8</span><span class="line"><span class="kind derive">derive</span>During Wallet&#39;s run (phase 0), attacker observes AEAD_ENC(HKDF(nil, DH_KEX(gy_pay, nil), nil), d_d, c_ad) on the wire.</span></button>
+						<button type="button" class="traceStep" data-step="9" aria-pressed="false"><span class="n">9</span><span class="line"><span class="kind derive">derive</span>During Wallet&#39;s run (phase 0), attacker observes PUBKEY(y) on the wire.</span></button>
+						<button type="button" class="traceStep" data-step="10" aria-pressed="false"><span class="n">10</span><span class="line"><span class="kind derive">derive</span>During Wallet&#39;s run (phase 0), attacker constructs DH_KEX(gy_pay, nil).</span></button>
+						<button type="button" class="traceStep" data-step="11" aria-pressed="false"><span class="n">11</span><span class="line"><span class="kind derive">derive</span>During Wallet&#39;s run (phase 0), attacker constructs HKDF(nil, DH_KEX(gy_pay, nil), nil).</span></button>
+						<button type="button" class="traceStep" data-step="12" aria-pressed="false"><span class="n">12</span><span class="line"><span class="kind derive">derive</span>During Wallet&#39;s run (phase 0), attacker opens AEAD_ENC(HKDF(nil, DH_KEX(gy_pay, nil), nil), d_d, c_ad) with HKDF(nil, DH_KEX(gy_pay, nil), nil), obtaining CONCAT(cp, cs, gy_pay).</span></button>
+						<button type="button" class="traceStep" data-step="13" aria-pressed="false"><span class="n">13</span><span class="line"><span class="kind derive">derive</span>Attacker constructs AEAD_ENC(r_d, d_d, c_ad).</span></button>
+
+					</details>
+					<button type="button" class="traceStep" data-step="14" aria-pressed="false"><span class="n">14</span><span class="line"><span class="kind mutations">mutations</span>Attacker intercepts the message from Wallet to Dapp and delivers:<span class="traceVal"><span class="tvName">gy</span> <span class="tvArrow">&#8656;</span> <span class="tvNew">PUBKEY(nil)</span><span class="tvWas">honest value: PUBKEY(y)</span></span><span class="traceVal"><span class="tvName">resp</span> <span class="tvArrow">&#8656;</span> <span class="tvNew">AEAD_ENC(r_d, d_d, c_ad)</span><span class="tvWas">honest value: AEAD_ENC(r, CONCAT(cp, cs, gy), c_ad)</span></span></span></button>
+					<button type="button" class="traceStep" data-step="15" aria-pressed="false"><span class="n">15</span><span class="line"><span class="kind gate">gate</span>Dapp&#39;s AEAD_DEC(r_d, AEAD_ENC(r_d, CONCAT(cp, cs, gy_pay), c_ad), c_ad)? passes — the attacker controls one of its inputs.</span></button>
+					<button type="button" class="traceStep" data-step="16" aria-pressed="false"><span class="n">16</span><span class="line"><span class="kind gate">gate</span>Dapp&#39;s SPLIT(d_d)? passes — the attacker controls one of its inputs.</span></button>
+					<button type="button" class="traceStep" data-step="17" aria-pressed="false"><span class="n">17</span><span class="line"><span class="kind gate">gate</span>Dapp&#39;s SPLIT(cp_d)? passes — the attacker controls one of its inputs.</span></button>
+					<button type="button" class="traceStep" data-step="18" aria-pressed="false"><span class="n">18</span><span class="line"><span class="kind gate">gate</span>Dapp&#39;s ASSERT(iss_d, gw)? passes — the attacker controls one of its inputs.</span></button>
+
+				</div>
+			</div>
+			<div class="panelSection trace" id="trace-m0-q1">
+				<span class="eyebrow">Attack trace &middot; <a class="q" href="#src-m0-q1">confidentiality? txdata</a></span>
+				<figure class="figure">
+					<div class="scroll">
+						<svg class="diagram" width="600" height="408" viewBox="0 0 600 408" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false">
+							<defs>
+								<marker id="m0t1-a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+									<path d="M 0 0 L 10 5 L 0 10 z" class="arrowhead" />
+								</marker>
+								<marker id="m0t1-b" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+									<path d="M 0 0 L 10 5 L 0 10 z" class="arrowheadB" />
+								</marker>
+							</defs>
+							<text x="100" y="22" class="actor">Dapp</text>
+							<line x1="100" y1="34" x2="100" y2="400" class="lifeline" />
+							<text x="300" y="22" class="actor">Wallet</text>
+							<line x1="300" y1="34" x2="300" y2="400" class="lifeline" />
+							<text x="500" y="22" class="actor attacker">Attacker</text>
+							<line x1="500" y1="34" x2="500" y2="400" class="lifeline attacker" />
+							<text x="100" y="54" class="leak">Dapp leaks symkey</text>
+							<g class="row" data-step="1-12">
+								<rect x="416" y="85" width="168" height="22" rx="3" class="runBox" /><text x="500" y="100" class="runLabel">computes (steps 1–12)</text>
+							</g>
+							<g class="row" data-step="13"><text x="22" y="133" class="hopNum">13</text>
+								<line x1="300" y1="140" x2="500" y2="140" class="wireMuted" marker-end="url(#m0t1-a)" />
+								<line x1="500" y1="140" x2="100" y2="140" class="wireForged" marker-end="url(#m0t1-b)" /><text x="300" y="133" class="msg forged">
+									<tspan class="msgHop">hop 3 &middot; </tspan>
+									<tspan class="msgVal ">gy</tspan>
+									<tspan class="msgSep">, </tspan>
+									<tspan class="msgVal ">resp</tspan>
+								</text>
+							</g>
+							<g class="row" data-step="14"><text x="22" y="186" class="hopNum">14</text>
+								<circle cx="100" cy="182" r="5" class="gateMark" /><text x="112" y="186" class="nodeLabel ">check passes</text>
+							</g>
+							<g class="row" data-step="15"><text x="22" y="228" class="hopNum">15</text>
+								<circle cx="100" cy="224" r="5" class="gateMark" /><text x="112" y="228" class="nodeLabel ">check passes</text>
+							</g>
+							<g class="row" data-step="16"><text x="22" y="270" class="hopNum">16</text>
+								<circle cx="100" cy="266" r="5" class="gateMark" /><text x="112" y="270" class="nodeLabel ">check passes</text>
+							</g>
+							<g class="row" data-step="17"><text x="22" y="312" class="hopNum">17</text>
+								<circle cx="100" cy="308" r="5" class="gateMark" /><text x="112" y="312" class="nodeLabel ">check passes</text>
+							</g>
+							<g class="row" data-step="18-19">
+								<rect x="416" y="337" width="168" height="22" rx="3" class="runBox" /><text x="500" y="352" class="runLabel">computes (steps 18–19)</text>
+							</g>
+						</svg>
+					</div>
+				</figure>
+				<div class="traceSteps">
+					<details class="traceGroup" data-step="1-12">
+						<summary><span class="n">1-12</span><span class="line"><span class="kind derive">derive</span>12 derivation steps</span></summary>
+						<button type="button" class="traceStep" data-step="1" aria-pressed="false"><span class="n">1</span><span class="line"><span class="kind derive">derive</span>Attacker constructs PUBKEY(nil).</span></button>
+						<button type="button" class="traceStep" data-step="2" aria-pressed="false"><span class="n">2</span><span class="line"><span class="kind derive">derive</span>Attacker observes req on the wire.</span></button>
+						<button type="button" class="traceStep" data-step="3" aria-pressed="false"><span class="n">3</span><span class="line"><span class="kind derive">derive</span>Attacker is handed symkey by a leaks declaration.</span></button>
+						<button type="button" class="traceStep" data-step="4" aria-pressed="false"><span class="n">4</span><span class="line"><span class="kind derive">derive</span>Attacker opens req with symkey, obtaining d_w.</span></button>
+						<button type="button" class="traceStep" data-step="5" aria-pressed="false"><span class="n">5</span><span class="line"><span class="kind derive">derive</span>Attacker splits d_w and takes gx.</span></button>
+						<button type="button" class="traceStep" data-step="6" aria-pressed="false"><span class="n">6</span><span class="line"><span class="kind derive">derive</span>Attacker constructs DH_KEX(gx, nil).</span></button>
+						<button type="button" class="traceStep" data-step="7" aria-pressed="false"><span class="n">7</span><span class="line"><span class="kind derive">derive</span>Attacker constructs HKDF(nil, DH_KEX(gx, nil), nil).</span></button>
+						<button type="button" class="traceStep" data-step="8" aria-pressed="false"><span class="n">8</span><span class="line"><span class="kind derive">derive</span>Attacker observes gw on the wire.</span></button>
+						<button type="button" class="traceStep" data-step="9" aria-pressed="false"><span class="n">9</span><span class="line"><span class="kind derive">derive</span>Attacker splits d_w and takes nonce.</span></button>
+						<button type="button" class="traceStep" data-step="10" aria-pressed="false"><span class="n">10</span><span class="line"><span class="kind derive">derive</span>Attacker constructs cp.</span></button>
+						<button type="button" class="traceStep" data-step="11" aria-pressed="false"><span class="n">11</span><span class="line"><span class="kind derive">derive</span>Attacker constructs CONCAT(cp, nil, PUBKEY(nil)).</span></button>
+						<button type="button" class="traceStep" data-step="12" aria-pressed="false"><span class="n">12</span><span class="line"><span class="kind derive">derive</span>Attacker constructs AEAD_ENC(r_d, d_d, c_ad).</span></button>
+
+					</details>
+					<button type="button" class="traceStep" data-step="13" aria-pressed="false"><span class="n">13</span><span class="line"><span class="kind mutations">mutations</span>Attacker intercepts the message from Wallet to Dapp and delivers:<span class="traceVal"><span class="tvName">gy</span> <span class="tvArrow">&#8656;</span> <span class="tvNew">PUBKEY(nil)</span><span class="tvWas">honest value: PUBKEY(y)</span></span><span class="traceVal"><span class="tvName">resp</span> <span class="tvArrow">&#8656;</span> <span class="tvNew">AEAD_ENC(r_d, d_d, c_ad)</span><span class="tvWas">honest value: AEAD_ENC(r, CONCAT(cp, cs, gy), c_ad)</span></span></span></button>
+					<button type="button" class="traceStep" data-step="14" aria-pressed="false"><span class="n">14</span><span class="line"><span class="kind gate">gate</span>Dapp&#39;s AEAD_DEC(r_d, AEAD_ENC(r_d, CONCAT(cp, nil, PUBKEY(nil)), c_ad), c_ad)? passes — the attacker controls one of its inputs.</span></button>
+					<button type="button" class="traceStep" data-step="15" aria-pressed="false"><span class="n">15</span><span class="line"><span class="kind gate">gate</span>Dapp&#39;s SPLIT(d_d)? passes — the attacker controls one of its inputs.</span></button>
+					<button type="button" class="traceStep" data-step="16" aria-pressed="false"><span class="n">16</span><span class="line"><span class="kind gate">gate</span>Dapp&#39;s SPLIT(cp_d)? passes — the attacker controls one of its inputs.</span></button>
+					<button type="button" class="traceStep" data-step="17" aria-pressed="false"><span class="n">17</span><span class="line"><span class="kind gate">gate</span>Dapp&#39;s ASSERT(iss_d, gw)? passes — the attacker controls one of its inputs.</span></button>
+					<details class="traceGroup" data-step="18-19">
+						<summary><span class="n">18-19</span><span class="line"><span class="kind derive">derive</span>2 derivation steps</span></summary>
+						<button type="button" class="traceStep" data-step="18" aria-pressed="false"><span class="n">18</span><span class="line"><span class="kind derive">derive</span>Attacker observes sessreq on the wire.</span></button>
+						<button type="button" class="traceStep" data-step="19" aria-pressed="false"><span class="n">19</span><span class="line"><span class="kind derive">derive</span>Attacker opens sessreq with r_d, obtaining txdata.</span></button>
+
+					</details>
+
+				</div>
+			</div>
+			<div class="panelSection">
+				<span class="eyebrow">Model source</span>
+				<div class="scroll">
+					<pre class="source"><code><span class="c">// FINDING 1 — a CACAO whose signature does not verify still establishes a</span>
+<span class="c">// persisted, subscribed session, for an account the attacker names.</span>
+<span class="c">//</span>
+<span class="c">// Expected: a1c1 at one session and at two.</span>
+<span class="c">//</span>
+<span class="c">// ---------------------------------------------------------------------------</span>
+<span class="c">// SOURCE OF EVERY MODELLING DECISION BELOW</span>
+<span class="c">// walletconnect-monorepo @ master</span>
+<span class="c">// ---------------------------------------------------------------------------</span>
+<span class="c">//</span>
+<span class="c">// utils/src/crypto.ts</span>
+<span class="c">//   deriveSymKey(priv, pub) = hkdf(sha256, x25519(priv, pub), undefined,</span>
+<span class="c">//                                  undefined, 32)          -- no salt, no info</span>
+<span class="c">//   hashKey(k)              = sha256(k)</span>
+<span class="c">//   type 1 envelope         = type | senderPublicKey | iv | sealed</span>
+<span class="c">//   encrypt()               = chacha20poly1305(symKey, iv).encrypt(msg)</span>
+<span class="c">//                             with NO associated data, so senderPublicKey is</span>
+<span class="c">//                             cleartext and unauthenticated.</span>
+<span class="c">//</span>
+<span class="c">// core/src/controllers/crypto.ts</span>
+<span class="c">//   encode(): for a type 1 envelope the symKey is NOT the topic&#39;s key --</span>
+<span class="c">//     topic = await this.generateSharedKey(senderPublicKey, receiverPublicKey)</span>
+<span class="c">//   so the response is sealed under the very key that becomes the session key.</span>
+<span class="c">//   decode(): the receiver derives that key from the senderPublicKey carried</span>
+<span class="c">//     IN the envelope:</span>
+<span class="c">//       generateSharedKey(params.receiverPublicKey, params.senderPublicKey)</span>
+<span class="c">//</span>
+<span class="c">// sign-client/src/controllers/engine.ts  authenticate()   [dapp side]</span>
+<span class="c">//   publicKey     = fresh x25519 keypair, stored under AUTH_PUBLIC_KEY_NAME</span>
+<span class="c">//   responseTopic = hashKey(publicKey)        -- hash of a PUBLIC key</span>
+<span class="c">//   request       = { authPayload: { type, chains, statement, aud, domain,</span>
+<span class="c">//                                    version, nonce, iat, exp, nbf, resources },</span>
+<span class="c">//                     requester: { publicKey, metadata }, expiryTimestamp }</span>
+<span class="c">//   sent on the pairing topic, sealed under the pairing symKey.</span>
+<span class="c">//</span>
+<span class="c">// sign-client/src/controllers/engine.ts  approveSessionAuthenticate()  [wallet]</span>
+<span class="c">//   receiverPublicKey = pendingRequest.requester.publicKey        (= gx here)</span>
+<span class="c">//   senderPublicKey   = fresh keypair                             (= gy here)</span>
+<span class="c">//   responseTopic     = hashKey(receiverPublicKey)</span>
+<span class="c">//   sessionTopic      = generateSharedKey(senderPublicKey, receiverPublicKey)</span>
+<span class="c">//   result            = { cacaos: auths,</span>
+<span class="c">//                         responder: { publicKey: senderPublicKey, metadata } }</span>
+<span class="c">//</span>
+<span class="c">//   NOTE the responder public key appears TWICE and the two are never compared:</span>
+<span class="c">//   once in the envelope (which decides the decryption key) and once inside the</span>
+<span class="c">//   ciphertext (which decides the session topic). They are modelled separately,</span>
+<span class="c">//   as gy_env and gy_pay.</span>
+<span class="c">//</span>
+<span class="c">// utils/src/cacao.ts</span>
+<span class="c">//   validateSignedCacao({ cacao }):</span>
+<span class="c">//     reconstructed = formatMessage(payload, payload.iss)   // payload IS cacao.p</span>
+<span class="c">//     return verifySignature(getDidAddress(payload.iss), reconstructed, ...)</span>
+<span class="c">//</span>
+<span class="c">//   The signed statement is therefore a deterministic function of the CACAO&#39;s</span>
+<span class="c">//   own payload, and the check is purely internal consistency: &quot;the address</span>
+<span class="c">//   named in `iss` signed this text&quot;. It is NOT compared against the request.</span>
+<span class="c">//   Grepping the engine confirms it: `nonce` occurs only where a request is</span>
+<span class="c">//   built and in isValidAuthenticate&#39;s input validation, never in a comparison</span>
+<span class="c">//   against a returned CACAO, and neither `domain` nor `aud` is ever compared.</span>
+<span class="c">//   The model reflects that by signing the payload directly.</span>
+<span class="c">//</span>
+<span class="c">// ---------------------------------------------------------------------------</span>
+<span class="c">// THE BEHAVIOUR UNDER TEST</span>
+<span class="c">// ---------------------------------------------------------------------------</span>
+<span class="c">//</span>
+<span class="c">// engine.ts, dapp-side onAuthenticate:</span>
+<span class="c">//</span>
+<span class="c">//     const isValid = await validateSignedCacao({ cacao, projectId });</span>
+<span class="c">//     if (!isValid) {</span>
+<span class="c">//       this.client.logger.error(cacao, &quot;Signature verification failed&quot;);</span>
+<span class="c">//       reject(getSdkError(&quot;SESSION_SETTLEMENT_FAILED&quot;, ...));</span>
+<span class="c">//     }</span>
+<span class="c">//     ... falls through ...</span>
+<span class="c">//     approvedChains  = [getNamespacedDidChainId(payload.iss)]</span>
+<span class="c">//     parsedAddress   = getDidAddress(payload.iss)</span>
+<span class="c">//     approvedMethods = getMethodsFromRecap(recap)          // from resources</span>
+<span class="c">//     const sessionTopic = await generateSharedKey(publicKey, responder.publicKey);</span>
+<span class="c">//     await this.client.core.relayer.subscribe(sessionTopic, { transportType });</span>
+<span class="c">//     await this.client.session.set(sessionTopic, session);</span>
+<span class="c">//</span>
+<span class="c">// reject() settles the promise but does not return, and onAuthenticate has no</span>
+<span class="c">// enclosing try/catch, so a CACAO that FAILS verification still reaches session</span>
+<span class="c">// construction. The approved account and methods are read from that same</span>
+<span class="c">// unvalidated payload. Store.set persists, so the session survives a restart.</span>
+<span class="c">// The wallet side of the identical check, ~190 lines below, does</span>
+<span class="c">// `await this.sendError(...)` and then `throw`.</span>
+<span class="c">//</span>
+<span class="c">// A check that does not halt is a SIGNVERIF without `?`. That is the whole</span>
+<span class="c">// difference between this model and 03-fix-verification.vp.</span>
+<span class="c">//</span>
+<span class="c">// ---------------------------------------------------------------------------</span>
+<span class="c">// PRECONDITION</span>
+<span class="c">// ---------------------------------------------------------------------------</span>
+<span class="c">//</span>
+<span class="c">// To address the response the attacker needs gx, which travels in the request</span>
+<span class="c">// under the pairing symKey. `leaks symkey` models the pairing URI being</span>
+<span class="c">// observed -- it is rendered as a QR code for the user to photograph, so it is</span>
+<span class="c">// exposed to anything that can see the screen. Over link mode this precondition</span>
+<span class="c">// disappears entirely: the request is a cleartext type 2 envelope in a URL.</span>
+
+<span class="k">attacker</span>[<span class="a">active</span>]
+
+<span class="k">principal</span> <span class="p">Wallet</span>[
+	<span class="k">knows</span> <span class="k">private</span> wsk            <span class="c">// the user&#39;s account key</span>
+	gw = <span class="f">PUBKEY</span>(wsk)             <span class="c">// the did:pkh address, public knowledge</span>
+]
+
+<span class="p">Wallet</span> -&gt; <span class="p">Dapp</span>: [gw]
+
+<span class="k">principal</span> <span class="p">Dapp</span>[
+	<span class="k">knows</span> <span class="k">private</span> symkey         <span class="c">// pairing symKey, from the URI</span>
+	<span class="k">knows</span> <span class="k">public</span> c_ad
+	<span class="k">knows</span> <span class="k">public</span> c_auth          <span class="c">// the wc_sessionAuthenticate method name</span>
+	<span class="k">knows</span> <span class="k">public</span> c_dom           <span class="c">// authPayload.domain and .aud</span>
+	<span class="k">generates</span> x
+	<span class="k">generates</span> nonce              <span class="c">// authPayload.nonce</span>
+	<span class="k">generates</span> txdata             <span class="c">// what the dapp sends once it believes it is authenticated</span>
+	gx = <span class="f">PUBKEY</span>(x)               <span class="c">// requester.publicKey; responseTopic = sha256(gx)</span>
+	req = <span class="f">AEAD_ENC</span>(symkey, <span class="f">CONCAT</span>(c_auth, gx, nonce, c_dom), c_ad)
+	<span class="k">leaks</span> symkey
+]
+
+<span class="p">Dapp</span> -&gt; <span class="p">Wallet</span>: req
+
+<span class="k">principal</span> <span class="p">Wallet</span>[
+	<span class="k">knows</span> <span class="k">private</span> symkey
+	<span class="k">knows</span> <span class="k">public</span> c_ad
+	<span class="k">knows</span> <span class="k">public</span> c_auth
+	<span class="k">knows</span> <span class="k">public</span> c_dom
+	<span class="k">knows</span> <span class="k">public</span> c_res           <span class="c">// authPayload.resources, carrying the recap</span>
+	<span class="k">generates</span> y
+	gy = <span class="f">PUBKEY</span>(y)
+	d_w = <span class="f">AEAD_DEC</span>(symkey, req, c_ad)?
+	tag_w, gx_w, nonce_w, dom_w = <span class="f">SPLIT</span>(d_w)?
+	_ = <span class="f">ASSERT</span>(tag_w, c_auth)?
+	<span class="c">// cacao.p: iss, domain, nonce, resources. formatMessage() is a function of</span>
+	<span class="c">// exactly this, so signing it directly is faithful.</span>
+	cp = <span class="f">CONCAT</span>(gw, dom_w, nonce_w, c_res)
+	cs = <span class="f">SIGN</span>(wsk, cp)
+	<span class="c">// The response is sealed under generateSharedKey(gy, gx) -- the session key.</span>
+	r = <span class="f">HKDF</span>(nil, <span class="f">DH_KEX</span>(gx_w, y), nil)
+	<span class="c">// result = { cacaos: [{p, s}], responder: { publicKey } }</span>
+	resp = <span class="f">AEAD_ENC</span>(r, <span class="f">CONCAT</span>(cp, cs, gy), c_ad)
+]
+
+<span class="c">// Type 1 envelope: the senderPublicKey field travels in the clear.</span>
+<span class="p">Wallet</span> -&gt; <span class="p">Dapp</span>: gy, resp
+
+<span class="k">principal</span> <span class="p">Dapp</span>[
+	<span class="c">// decode(): the decryption key comes from the envelope&#39;s senderPublicKey.</span>
+	r_d = <span class="f">HKDF</span>(nil, <span class="f">DH_KEX</span>(gy, x), nil)
+	d_d = <span class="f">AEAD_DEC</span>(r_d, resp, c_ad)?
+	cp_d, cs_d, gy_pay = <span class="f">SPLIT</span>(d_d)?
+	<span class="c">// validateSignedCacao: reconstruct from the payload, verify against the</span>
+	<span class="c">// address the payload itself names. No comparison with nonce or c_dom.</span>
+	iss_d, dom_d, non_d, res_d = <span class="f">SPLIT</span>(cp_d)?
+	<span class="c">// The dapp is authenticating a PARTICULAR account -- it is re-authenticating</span>
+	<span class="c">// a known user, or matching the address against its own records. Without</span>
+	<span class="c">// this the queries below fail for an uninteresting reason: anyone may</span>
+	<span class="c">// answer an authenticate request with a CACAO for their OWN account, and</span>
+	<span class="c">// will of course hold the resulting session. That is connecting a wallet,</span>
+	<span class="c">// not impersonating one. This assertion is what makes the failure mean</span>
+	<span class="c">// &quot;the dapp accepted a session for gw&quot;.</span>
+	_ = <span class="f">ASSERT</span>(iss_d, gw)?
+	<span class="c">// AS IMPLEMENTED: verification failure logs and rejects, then falls through.</span>
+	<span class="c">// No `?`, so the dapp does not halt on a bad signature.</span>
+	_ = <span class="f">SIGNVERIF</span>(iss_d, cp_d, cs_d)
+	<span class="c">// sessionTopic = generateSharedKey(publicKey, responder.publicKey) -- note</span>
+	<span class="c">// this uses the key from INSIDE the payload, not the envelope&#39;s.</span>
+	sess_d = <span class="f">HKDF</span>(nil, <span class="f">DH_KEX</span>(gy_pay, x), nil)
+	sessreq = <span class="f">AEAD_ENC</span>(sess_d, txdata, c_ad)
+]
+
+<span class="p">Dapp</span> -&gt; <span class="p">Wallet</span>: sessreq
+
+<span class="k">principal</span> <span class="p">Wallet</span>[
+	_ = <span class="f">AEAD_DEC</span>(r, sessreq, c_ad)?
+]
+
+<span class="k">queries</span>[
+	<span class="c">// Can the dapp be made to accept a response the wallet did not author?</span>
+	<mark id="src-m0-q0" class="fail" tabindex="-1">authentication? Wallet -&gt; Dapp: resp</mark>
+	<span class="c">// Does the attacker end up holding the session it establishes?</span>
+	<mark id="src-m0-q1" class="fail" tabindex="-1">confidentiality? txdata</mark>
+]
+</code></pre>
+				</div>
+			</div>
+			<div class="panelSection scope">
+				<span class="eyebrow">Scope of this result</span>
+				<p>Every verdict above was reached against an active attacker, with each principal running 2 concurrent sessions, over exactly the model as written. An attack is a witness and stands on its own. A query reported as holding says only that this search found no attack at those parameters: the search space this engine defines was explored, which is never the space of all attacks.</p>
+			</div>
+		</div>
+	</section>
+	<footer class="pageFoot">
+		<p>Verifpal is sound but incomplete. Every attack shown here is a genuine attack on the model as written; a query reported as holding means no attack was found within the search this run performed, which is never a proof that none exists.</p>
+	</footer>
+	<script>
+		(function() {
+			'use strict';
+
+			function span(el) {
+				var parts = el.getAttribute('data-step').split('-');
+				var a = parseInt(parts[0], 10);
+				var b = parts.length > 1 ? parseInt(parts[1], 10) : a;
+				return [a, b];
+			}
+
+			function pressable(el) {
+				return el.hasAttribute('aria-pressed');
+			}
+
+			document.querySelectorAll('.trace').forEach(function(trace) {
+				var rows = Array.prototype.slice.call(trace.querySelectorAll('[data-step]'));
+				if (rows.length === 0) {
+					return;
+				}
+				var pinned = null;
+
+				function paint(row) {
+					var mine = row === null ? null : span(row);
+					rows.forEach(function(other) {
+						var theirs = span(other);
+						var on = mine !== null && mine[0] <= theirs[1] && theirs[0] <= mine[1];
+						other.classList.toggle('isOn', on);
+						if (pressable(other)) {
+							other.setAttribute('aria-pressed', other === pinned ? 'true' : 'false');
+						}
+					});
+				}
+
+				function show(row) {
+					paint(row === null ? pinned : row);
+				}
+				rows.forEach(function(row) {
+					row.addEventListener('mouseenter', function() {
+						show(row);
+					});
+					row.addEventListener('mouseleave', function() {
+						show(null);
+					});
+					row.addEventListener('focusin', function() {
+						show(row);
+					});
+					row.addEventListener('focusout', function() {
+						show(null);
+					});
+					if (!pressable(row)) {
+						return;
+					}
+					row.addEventListener('click', function() {
+						pinned = pinned === row ? null : row;
+						show(null);
+					});
+				});
+			});
+
+			document.querySelectorAll('section.model').forEach(function(model) {
+				var values = Array.prototype.slice.call(model.querySelectorAll('.msgVal[data-q]'));
+				if (values.length === 0) {
+					return;
+				}
+				var tagged = values.map(function(value) {
+					return value.getAttribute('data-q').split(' ');
+				});
+
+				function isolate(index) {
+					values.forEach(function(value, i) {
+						var mine = index !== null && tagged[i].indexOf(index) >= 0;
+						value.classList.toggle('isHit', mine);
+						value.classList.toggle('isDim', index !== null && !mine);
+					});
+				}
+				model.querySelectorAll('.verdict[data-query]').forEach(function(verdict) {
+					var index = verdict.getAttribute('data-query');
+
+					function on() {
+						isolate(index);
+					}
+
+					function off() {
+						isolate(null);
+					}
+					verdict.addEventListener('mouseenter', on);
+					verdict.addEventListener('mouseleave', off);
+					verdict.addEventListener('focusin', on);
+					verdict.addEventListener('focusout', off);
+				});
+			});
+
+			var only = document.getElementById('onlyFailing');
+			if (only) {
+				only.addEventListener('change', function() {
+					var hide = only.checked;
+					document
+						.querySelectorAll('.runItem[data-failing], section.model[data-failing]')
+						.forEach(function(el) {
+							el.hidden = hide && el.getAttribute('data-failing') !== 'yes';
+						});
+				});
+			}
+
+			var reopen = [];
+			window.addEventListener('beforeprint', function() {
+				reopen = [];
+				document.querySelectorAll('details.traceGroup').forEach(function(group) {
+					if (!group.open) {
+						reopen.push(group);
+						group.open = true;
+					}
+				});
+			});
+			window.addEventListener('afterprint', function() {
+				reopen.forEach(function(group) {
+					group.open = false;
+				});
+				reopen = [];
+			});
+		})();
+	</script>
+</body>
+
+</html>
