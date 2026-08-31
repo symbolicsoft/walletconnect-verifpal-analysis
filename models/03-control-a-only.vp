@@ -1,0 +1,86 @@
+// CONTROL for 03-fix-verification-fast.vp — change (a) alone.
+//
+// Result under Verifpal 1.3.7: a1c1 (<1s).
+//
+// This is 03-fix-verification-fast.vp with changes (b) and (c) removed: the
+// signature check halts, but the CACAO is not compared against the request and
+// the signed statement does not cover the responder public key. It is
+// 02-unbound-statement.vp's finding, re-expressed in the flat encoding.
+//
+// Its job is to show that the flattening in 03-fix-verification-fast.vp did
+// not remove the attack. If this model passed, that model's c0 would be an
+// artefact of the reduction rather than the effect of the fix. It fails, so
+// the c0 is the binding doing the work.
+//
+// The attacker holds a genuine CACAO the wallet issued for a site the attacker
+// runs, and presents it to an unrelated dapp. Nothing in the dapp notices that
+// the statement answers a different question.
+
+attacker[active]
+
+principal Wallet[
+	knows private wsk
+	knows public c_edom          // the domain of a site the attacker runs
+	knows public c_enonce        // and the nonce that site chose
+	gw = PUBKEY(wsk)
+	ecs = SIGN(wsk, CONCAT(gw, c_edom, c_enonce))
+	leaks ecs
+]
+
+Wallet -> Dapp: [gw]
+
+principal Dapp[
+	knows private symkey
+	knows public c_ad
+	knows public c_auth
+	knows public c_dom
+	generates x
+	generates nonce
+	generates txdata
+	gx = PUBKEY(x)
+	req = AEAD_ENC(symkey, CONCAT(c_auth, gx, nonce, c_dom), c_ad)
+	leaks symkey
+]
+
+Dapp -> Wallet: req
+
+principal Wallet[
+	knows private symkey
+	knows public c_ad
+	knows public c_auth
+	generates y
+	gy = PUBKEY(y)
+	d_w = AEAD_DEC(symkey, req, c_ad)?
+	tag_w, gx_w, nonce_w, dom_w = SPLIT(d_w)?
+	_ = ASSERT(tag_w, c_auth)?
+	// NOT (c): the statement does not cover the responder public key.
+	cs = SIGN(wsk, CONCAT(gw, dom_w, nonce_w))
+	r = HKDF(nil, DH_KEX(gx_w, y), nil)
+	resp = AEAD_ENC(r, CONCAT(gw, dom_w, nonce_w, cs, gy), c_ad)
+]
+
+Wallet -> Dapp: gy, resp
+
+principal Dapp[
+	r_d = HKDF(nil, DH_KEX(gy, x), nil)
+	d_d = AEAD_DEC(r_d, resp, c_ad)?
+	iss_d, dom_d, non_d, cs_d, gy_pay = SPLIT(d_d)?
+	_ = ASSERT(iss_d, gw)?
+	// NOT (b): no comparison against the request's domain or nonce.
+	// (a) the check halts.
+	_ = SIGNVERIF(iss_d, CONCAT(iss_d, dom_d, non_d), cs_d)?
+	// The session is keyed to an unsigned field of the same message.
+	sess_d = HKDF(nil, DH_KEX(gy_pay, x), nil)
+	sessreq = AEAD_ENC(sess_d, txdata, c_ad)
+]
+
+Dapp -> Wallet: sessreq
+
+principal Wallet[
+	_ = AEAD_DEC(r, sessreq, c_ad)?
+]
+
+queries[
+	authentication? Wallet -> Dapp: resp
+	confidentiality? txdata
+]

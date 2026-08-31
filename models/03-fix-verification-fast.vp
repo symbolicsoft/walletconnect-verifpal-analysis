@@ -1,0 +1,180 @@
+// FIX VERIFICATION — what actually has to change.
+//
+// Result under Verifpal 1.3.7:
+//   a1c0, PASS + confidentiality? txdata [search exhausted at 2 sessions]  (3s)
+//   a1c0, PASS + confidentiality? txdata [search exhausted at 4 sessions] (24s)
+//
+// The `a1` is not a finding and does not go away: a type 1 envelope is
+// authenticated only by knowledge of the receiver's public key, so anyone
+// holding gx can author a response the dapp will decrypt. What matters is the
+// `c0` -- the attacker can no longer end up holding a session the dapp
+// believes belongs to gw.
+//
+// ---------------------------------------------------------------------------
+// THREE CHANGES. THE THIRD IS THE ONE THAT MATTERS, AND THE EASIEST TO MISS.
+// ---------------------------------------------------------------------------
+//
+// (a) `return` after `reject()` in the dapp-side onAuthenticate handler.
+//     Modelled as SIGNVERIF(...)?.
+//     Alone, NOT enough: 02-unbound-statement.vp already has it and still
+//     fails, because a genuine signature over a different statement passes a
+//     check that only asks whether the payload is self-consistent.
+//     Confirmed in this encoding by 03-control-a-only.vp, which is this model
+//     with (b) and (c) removed and which returns a1c1.
+//
+// (b) Compare the returned CACAO against the request: its domain/aud and
+//     nonce must be the ones this dapp issued. Modelled as two ASSERTs.
+//     Alone, NOT enough: 01-signature-bypass.vp's attacker reads the dapp's
+//     own domain and nonce off the request and builds its forged payload out
+//     of them, so the comparison passes.
+//
+//     And (a)+(b) together are still not enough. An attacker holding the
+//     pairing key can re-key the request, make the wallet seal its reply under
+//     a key the attacker knows, and harvest the genuine CACAO for this very
+//     request -- right domain, right nonce, real signature. Confirmed in this
+//     encoding by 03-control-ab-only.vp, which returns a1c1.
+//
+// (c) Bind the responder public key into the signed statement, and have the
+//     dapp key the session with the key the statement names. This is the
+//     change that closes it.
+//
+//     The reason is structural. The CACAO authenticates an ACCOUNT. The
+//     session key is derived from `responder.publicKey`, a field of the same
+//     message that no signature covers:
+//
+//       sessionTopic = generateSharedKey(publicKey, responder.publicKey)
+//
+//     so however thoroughly the CACAO is checked, the session it keys can
+//     belong to somebody else. Authentication and key agreement are disjoint
+//     until (c) joins them.
+//
+// ---------------------------------------------------------------------------
+// MODELLING NOTES
+// ---------------------------------------------------------------------------
+//
+// The attacker's capability in 02-unbound-statement.vp is that it holds a
+// genuine CACAO the wallet issued for a DIFFERENT relying party -- the user
+// really did sign in to the attacker's own site, honestly, and the attacker
+// kept the result. Simulating that whole exchange is expensive to search, and
+// the capability is all that matters, so here the wallet simply issues that
+// CACAO and leaks it. Same power in the attacker's hands, a model that
+// terminates. 03-fix-verification.vp retains the full second exchange and does
+// not finish; that is a search-cost artefact, not a result.
+//
+// FLAT PAYLOAD. An earlier version of this model nested the CACAO payload
+// inside the response -- SPLIT(d_d) into three, then SPLIT(cp_d) into four --
+// and did not terminate either, because the solver gives every field of every
+// SPLIT its own candidate value and the two levels multiply out. The payload
+// fields are therefore carried at one level here, and the dapp reconstructs
+// the signed statement rather than parsing it out of the message. That is also
+// closer to the implementation: validateSignedCacao does not read a signed
+// blob off the wire, it rebuilds the message with
+// formatMessage(payload, payload.iss) from the payload's own fields.
+//
+// CONCAT takes at most five arguments, which is why `responder.publicKey` is
+// not carried a second time as a separate field. In the fixed protocol the
+// dapp must end up keying the session with the public key the statement names;
+// modelling that directly, rather than as an equality check between two copies
+// of the same value, encodes the same requirement in one field. The two-copy
+// arrangement, and the fact that the implementation never compares them, is
+// what 01-signature-bypass.vp models as gy_env and gy_pay.
+//
+// The reshaping does not flatten the attack away: 03-control-a-only.vp and
+// 03-control-ab-only.vp share this encoding exactly and both return a1c1.
+// The c0 below is the binding doing the work, not the reduction.
+//
+// ---------------------------------------------------------------------------
+// PRECONDITION
+// ---------------------------------------------------------------------------
+//
+// `leaks symkey` models the pairing URI being observed -- it is rendered as a
+// QR code for the user to photograph, so it is exposed to anything that can
+// see the screen. Over link mode this precondition disappears entirely: the
+// request is a cleartext type 2 envelope in a URL.
+
+attacker[active]
+
+principal Wallet[
+	knows private wsk            // the user's account key
+	knows public c_edom          // the domain of a site the attacker runs
+	knows public c_enonce        // and the nonce that site chose
+	generates ey
+	gw = PUBKEY(wsk)             // the did:pkh address, public knowledge
+	gey = PUBKEY(ey)             // the responder key from that other exchange
+	// The CACAO issued during an honest sign-in to the attacker's own site.
+	// The user really did approve it; the attacker really does hold it.
+	ecs = SIGN(wsk, CONCAT(gw, c_edom, c_enonce, gey))
+	leaks ecs
+	leaks gey
+]
+
+Wallet -> Dapp: [gw]
+
+principal Dapp[
+	knows private symkey         // pairing symKey, from the URI
+	knows public c_ad
+	knows public c_auth          // the wc_sessionAuthenticate method name
+	knows public c_dom           // authPayload.domain and .aud
+	generates x
+	generates nonce              // authPayload.nonce
+	generates txdata             // what the dapp sends once it believes it is authenticated
+	gx = PUBKEY(x)               // requester.publicKey; responseTopic = sha256(gx)
+	req = AEAD_ENC(symkey, CONCAT(c_auth, gx, nonce, c_dom), c_ad)
+	leaks symkey
+]
+
+Dapp -> Wallet: req
+
+principal Wallet[
+	knows private symkey
+	knows public c_ad
+	knows public c_auth
+	generates y
+	gy = PUBKEY(y)
+	d_w = AEAD_DEC(symkey, req, c_ad)?
+	tag_w, gx_w, nonce_w, dom_w = SPLIT(d_w)?
+	_ = ASSERT(tag_w, c_auth)?
+	// (c) the signed statement now covers the responder public key.
+	cs = SIGN(wsk, CONCAT(gw, dom_w, nonce_w, gy))
+	r = HKDF(nil, DH_KEX(gx_w, y), nil)
+	resp = AEAD_ENC(r, CONCAT(gw, dom_w, nonce_w, gy, cs), c_ad)
+]
+
+// Type 1 envelope: the senderPublicKey field travels in the clear.
+Wallet -> Dapp: gy, resp
+
+principal Dapp[
+	// decode(): the decryption key comes from the envelope's senderPublicKey.
+	r_d = HKDF(nil, DH_KEX(gy, x), nil)
+	d_d = AEAD_DEC(r_d, resp, c_ad)?
+	iss_d, dom_d, non_d, gyc_d, cs_d = SPLIT(d_d)?
+	// The dapp is authenticating a PARTICULAR account -- it is re-authenticating
+	// a known user, or matching the address against its own records. Without
+	// this the queries below fail for an uninteresting reason: anyone may
+	// answer an authenticate request with a CACAO for their OWN account, and
+	// will of course hold the resulting session. That is connecting a wallet,
+	// not impersonating one.
+	_ = ASSERT(iss_d, gw)?
+	// (b) the CACAO must answer THIS request.
+	_ = ASSERT(dom_d, c_dom)?
+	_ = ASSERT(non_d, nonce)?
+	// (a) the signature check must halt. The message verified is rebuilt from
+	// the payload's own fields, as validateSignedCacao does.
+	_ = SIGNVERIF(iss_d, CONCAT(iss_d, dom_d, non_d, gyc_d), cs_d)?
+	// (c) the session is keyed to the public key the statement names.
+	sess_d = HKDF(nil, DH_KEX(gyc_d, x), nil)
+	sessreq = AEAD_ENC(sess_d, txdata, c_ad)
+]
+
+Dapp -> Wallet: sessreq
+
+principal Wallet[
+	_ = AEAD_DEC(r, sessreq, c_ad)?
+]
+
+queries[
+	// Can the dapp be made to accept a response the wallet did not author?
+	authentication? Wallet -> Dapp: resp
+	// Does the attacker end up holding the session it establishes?
+	confidentiality? txdata
+]

@@ -6,6 +6,8 @@
   "dependencies": {
     "@walletconnect/sign-client": "^2.24.0",
     "@walletconnect/utils": "^2.24.0",
-    "ox": "^1.7.4"
+    "ox": "^1.7.4",
+    "unstorage": "^1.17.1",
+    "ws": "^7.5.13"
   }
 }

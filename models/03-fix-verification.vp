@@ -1,0 +1,161 @@
+// FIX VERIFICATION — full two-exchange model.
+//
+// Expected: a1c0. UNKNOWN IN PRACTICE: this model does not terminate. It ran
+// past fifteen minutes at the shipped default and past two minutes at
+// --sessions 1 without producing a verdict, so the expectation above is what
+// the protocol should give, not something observed.
+//
+// Retained deliberately, unreduced, as a termination test case for the engine.
+// 03-fix-verification-fast.vp is the reduced version that does terminate and
+// gives a1c0; use that one for the finding, and this one for the engine.
+//
+// ---------------------------------------------------------------------------
+// WHAT THIS MODEL IS
+// ---------------------------------------------------------------------------
+//
+// The same fix as 03-fix-verification-fast.vp -- (a) a halting signature
+// check, (b) comparing the CACAO's domain and nonce against the request, and
+// (c) binding the responder public key into the signed statement and checking
+// it against the key the session will actually use -- but with the attacker's
+// CACAO obtained the way it really would be, through a complete honest
+// sign-in to a relying party the attacker controls, rather than by a `leaks`
+// declaration.
+//
+// Nothing here is exotic. Two sequential authenticate exchanges over the same
+// wallet, four ASSERTs and a SIGNVERIF on the second one, tuples of five.
+// Every primitive is ordinary and the message flow is linear.
+//
+// ---------------------------------------------------------------------------
+// WHAT IS ALREADY KNOWN ABOUT THE NON-TERMINATION
+// ---------------------------------------------------------------------------
+//
+//   * It is not session replication. It hangs at --sessions 1 too.
+//   * It is not tuple arity on its own. Reducing the CACAO payload from five
+//     elements to four -- dropping `resources`, so `CONCAT(gw, dom, non, gy)`
+//     with a four-way SPLIT -- still hangs at --sessions 1.
+//   * It is not the assertions on their own. 02-unbound-statement.vp has the
+//     same two-exchange shape, the same five-element tuples, and ASSERT plus
+//     a checked SIGNVERIF, and it completes in about 400ms.
+//   * The single-exchange reduction completes in well under a second.
+//
+// So the difference between the ~400ms model and this one is the two extra
+// ASSERTs of (b) and the one of (c) -- four checked assertions in the final
+// principal block instead of one -- on top of the two-exchange structure.
+// Neighbouring models in this directory run in 0.19s to 0.4s.
+
+attacker[active]
+
+principal Wallet[
+	knows private wsk
+	gw = PUBKEY(wsk)
+]
+
+Wallet -> Dapp: [gw]
+Wallet -> Evil: [gw]
+
+// ===========================================================================
+// Exchange 1: the user honestly signs in to Evil's site.
+// ===========================================================================
+
+principal Evil[
+	knows private esym
+	knows public c_ad
+	knows public c_auth
+	knows public c_edom
+	knows public c_res
+	generates ex
+	generates enonce
+	gex = PUBKEY(ex)
+	ereq = AEAD_ENC(esym, CONCAT(c_auth, gex, enonce, c_edom), c_ad)
+]
+
+Evil -> Wallet: ereq
+
+principal Wallet[
+	knows private esym
+	knows public c_ad
+	knows public c_auth
+	knows public c_res
+	generates ey
+	gey = PUBKEY(ey)
+	de_w = AEAD_DEC(esym, ereq, c_ad)?
+	etag, gex_w, enonce_w, edom_w = SPLIT(de_w)?
+	_ = ASSERT(etag, c_auth)?
+	ecp = CONCAT(gw, edom_w, enonce_w, c_res, gey)
+	ecs = SIGN(wsk, ecp)
+	er = HKDF(nil, DH_KEX(gex_w, ey), nil)
+	eresp = AEAD_ENC(er, CONCAT(ecp, ecs, gey), c_ad)
+]
+
+Wallet -> Evil: gey, eresp
+
+principal Evil[
+	er_e = HKDF(nil, DH_KEX(gey, ex), nil)
+	de_e = AEAD_DEC(er_e, eresp, c_ad)?
+	ecp_r, ecs_r, gey_p = SPLIT(de_e)?
+	leaks ecp_r
+	leaks ecs_r
+]
+
+// ===========================================================================
+// Exchange 2: the honest dapp, performing all three checks.
+// ===========================================================================
+
+principal Dapp[
+	knows private symkey
+	knows public c_ad
+	knows public c_auth
+	knows public c_dom
+	generates x
+	generates nonce
+	generates txdata
+	gx = PUBKEY(x)
+	req = AEAD_ENC(symkey, CONCAT(c_auth, gx, nonce, c_dom), c_ad)
+	leaks symkey
+]
+
+Dapp -> Wallet: req
+
+principal Wallet[
+	knows private symkey
+	knows public c_dom
+	generates y
+	gy = PUBKEY(y)
+	d_w = AEAD_DEC(symkey, req, c_ad)?
+	tag_w, gx_w, nonce_w, dom_w = SPLIT(d_w)?
+	_ = ASSERT(tag_w, c_auth)?
+	cp = CONCAT(gw, dom_w, nonce_w, c_res, gy)
+	cs = SIGN(wsk, cp)
+	r = HKDF(nil, DH_KEX(gx_w, y), nil)
+	resp = AEAD_ENC(r, CONCAT(cp, cs, gy), c_ad)
+]
+
+Wallet -> Dapp: gy, resp
+
+principal Dapp[
+	r_d = HKDF(nil, DH_KEX(gy, x), nil)
+	d_d = AEAD_DEC(r_d, resp, c_ad)?
+	cp_d, cs_d, gy_pay = SPLIT(d_d)?
+	iss_d, dom_d, non_d, res_d, gyc_d = SPLIT(cp_d)?
+	_ = ASSERT(iss_d, gw)?
+	// (b) the CACAO must answer THIS request.
+	_ = ASSERT(dom_d, c_dom)?
+	_ = ASSERT(non_d, nonce)?
+	// (c) and it must name the key this session will actually use.
+	_ = ASSERT(gyc_d, gy_pay)?
+	// (a) and the signature check must halt.
+	_ = SIGNVERIF(iss_d, cp_d, cs_d)?
+	sess_d = HKDF(nil, DH_KEX(gy_pay, x), nil)
+	sessreq = AEAD_ENC(sess_d, txdata, c_ad)
+]
+
+Dapp -> Wallet: sessreq
+
+principal Wallet[
+	_ = AEAD_DEC(r, sessreq, c_ad)?
+]
+
+queries[
+	authentication? Wallet -> Dapp: resp
+	confidentiality? txdata
+]
